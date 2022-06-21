@@ -6,12 +6,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="shortcut icon" href="./favicon.ico" />
   <title></title>
-
+  <link rel="stylesheet" href="https://unpkg.com/font-awesome@4.7.0/css/font-awesome.min.css">
 
 </head>
 
 <body>
+  <style id="bootstrap_css">
 
+  </style>
+  <style id="body_opacity">
+    body:before{
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: -1;
+      content: "";
+      position: fixed;
+      background: rgba(0, 0, 0, 0.449) center/cover;
+      opacity: 0.3;
+    }
+  </style>
   <style id="blogcss">
     .article-item,
     .article-content,
@@ -23,6 +38,14 @@
       margin-bottom: 30px;
       padding: 16px;
       box-shadow: 0 3px 1px -2px rgb(0 0 0 / 60%),
+        0 2px 2px 0 rgb(0 0 0 / 36%), 0 1px 5px 0 rgb(0 0 0 / 32%);
+      opacity: 0.8;
+      border-radius: 12px;
+    }
+
+    .articlebottomnav{
+      background-color: white;
+      box-shadow: 0 1px 1px -2px rgb(0 0 0 / 20%),
         0 2px 2px 0 rgb(0 0 0 / 36%), 0 1px 5px 0 rgb(0 0 0 / 32%);
       opacity: 0.8;
       border-radius: 12px;
@@ -48,6 +71,7 @@
       border-bottom-left-radius: 12px;
       max-width: 100%;
       height: 100%;
+      max-height: 136px;
     }
 
     @media (max-width: 1050px) {
@@ -501,8 +525,13 @@
     }
   </style>
   <style id="custom_css"></style>
+  <div id="loading" style="font-family: sans-serif">
+    <br /><br /><br />
+    <center><h2>Loading...</h2></center>
+  </div>
+  
   <div id="top"></div>
-  <div id="root"></div>
+  <div id="root" style="display:none;"></div>
   <div id="back_to_top_btn">
     <a href="#top" class="btn btn-secondary"><i class="fa fa-angle-up"></i></a>
   </div>
@@ -531,11 +560,24 @@
     function switch_to_night_mode() {
       document.getElementById("whether_nightmode").innerHTML = `
           body{
-            background-color:black;
+            background-color:#000000c7;
             
           }
-          #blog_index_title,#blog_index_subtitle{
+          #blog_index_title,#blog_index_subtitle, .article-content h2,.page-content h2, #article-content-html *, #page-content-html *{
             color:white;
+          }
+          .article-item, .article-content, .page-content{
+            background-color:#000000a8
+          }
+          .article-item p, .article-item-sub, .article-content-sub, #page_order_html, #bottom_info_html{
+            color:lightgrey!important;
+          }
+          a{
+            color:#67a5ff
+          }
+          .card{
+            background-color:black;
+            color:white
           }
           `;
       localStorage.setItem("is_nightmode", "on");
@@ -553,6 +595,21 @@
         switch_to_light_mode();
       }
     }
+
+    function detect_whether_ui_load_finished(){
+      if(bootstrap_css_import_finished === true && content_load_finished === true){
+        document.getElementById("root").setAttribute("style","");
+        document.getElementById("loading").setAttribute("style","display:none");
+      }
+    }
+
+    function copy_full_article_to_clipboard(){    
+      navigator.clipboard.writeText(document.querySelector("#article-content-html").innerText);
+      document.getElementById("copy_to_clipboard_button").innerHTML=`<i class="fa fa-check"></i> 已复制！`;
+    }
+
+    bootstrap_css_import_finished = false;
+    content_load_finished = false;
 
     const langdata = {
       "ARCHIVE_AND_TAGS": {
@@ -798,7 +855,7 @@
 
         document.getElementById("container").innerHTML += `
         <br /><br />
-        <p style="color:grey;">你当前正在浏览文章列表的第${currentArticleListPageOrder}页（共${articleListPageLength}页）。
+        <p style="color:grey;" id="page_order_html">你当前正在浏览文章列表的第${currentArticleListPageOrder}页（共${articleListPageLength}页）。
 </p>
         
         
@@ -859,8 +916,32 @@
           Date.parse(new Date())
         )
         .then(function (response) {
-          document.querySelector("#article-content").innerHTML +=
-            marked.parse(response.data);
+          document.querySelector("#article-content").innerHTML +=`
+            <div id="article-content-html">${marked.parse(response.data)}</div>`;
+          
+            if(blog["提供文章文件下载"] || blog["提供复制全文到剪贴板的选项"]){
+            document.getElementById("article-content").innerHTML+=`
+            <br />
+            <div style="float:right;font-size:18px" id="article-bottom-bar">
+            
+              </div><br />
+            `
+          }
+            
+
+
+            if(blog["提供文章文件下载"]){
+            document.getElementById("article-bottom-bar").innerHTML+=`
+              <a class="btn btn-primary" href="./data/articles/${blog["文章列表"][article_id]["文件名"]}" download="${blog["文章列表"][article_id]["文章标题"]}.md"><i class="fa fa-download"></i> 将该文章下载到你的计算机上</a>
+            `;
+          }
+
+          if(blog["提供复制全文到剪贴板的选项"]){
+            document.getElementById("article-bottom-bar").innerHTML+=`
+              <a class="btn btn-primary" id="copy_to_clipboard_button" onclick="copy_full_article_to_clipboard();"><i class="fa fa-clipboard"></i> 复制全文到剪贴板</a>
+            `;
+          }
+
           if (blog["不使用全站内容授权协议"] === false) {
             document.querySelector(
               "#article-content"
@@ -873,7 +954,108 @@
             `;
           }
 
+          if(blog["文章页面显示上一篇下一篇文章导航按钮"]){
 
+
+            if(article_id === 0 && blog["文章列表"][article_id+1] != undefined && blog["文章列表"][article_id+1]["是否隐藏"] !== true){
+              document.getElementById("container").innerHTML += `
+              <div class="row">
+    <div class="col">
+      <div class="card articlebottomnav" style="float:left;width:100%">
+  <div class="card-body">
+    <h6 class="card-subtitle mb-2 text-muted"><i class="fa fa-arrow-left"></i> 上一篇文章</h6>
+    <h5 class="card-title"><a href="./index.html?type=article&filename=${blog["文章列表"][article_id+1]["文件名"]}">${blog["文章列表"][article_id+1]["文章标题"]}</a></h5>
+  </div>
+</div>
+    </div>
+    <div class="col">
+      <div class="card articlebottomnav" style="float:right;text-align:right;width:100%">
+  <div class="card-body">
+    <h6 class="card-subtitle mb-2 text-muted">下一篇文章 <i class="fa fa-arrow-right"></i></h6>
+    <h5 class="card-title">没有了</h5>
+  </div>
+</div>
+    </div>
+  </div>
+     
+            `
+            }
+
+            if(article_id === 0 && blog["文章列表"][article_id+1] == undefined){
+              document.getElementById("container").innerHTML += `
+            <div class="row">
+    <div class="col">
+      <div class="card articlebottomnav" style="float:left;width:100%">
+  <div class="card-body">
+    <h6 class="card-subtitle mb-2 text-muted"><i class="fa fa-arrow-left"></i> 上一篇文章</h6>
+    <h5 class="card-title">没有了</h5>
+  </div>
+</div>
+    </div>
+    <div class="col">
+      <div class="card articlebottomnav" style="float:right;text-align:right;width:100%">
+  <div class="card-body">
+    <h6 class="card-subtitle mb-2 text-muted">下一篇文章 <i class="fa fa-arrow-right"></i></h6>
+    <h5 class="card-title">没有了</h5>
+  </div>
+</div>
+    </div>
+  </div>
+     
+            `
+            }
+
+            if(article_id !== 0 && blog["文章列表"][article_id+1] == undefined && blog["文章列表"][article_id-1]["是否隐藏"] !== true){
+              document.getElementById("container").innerHTML += `
+              <div class="row">
+    <div class="col">
+      <div class="card articlebottomnav" style="float:left;width:100%">
+  <div class="card-body">
+    <h6 class="card-subtitle mb-2 text-muted"><i class="fa fa-arrow-left"></i> 上一篇文章</h6>
+    <h5 class="card-title">没有了</h5>
+  </div>
+</div>
+    </div>
+    <div class="col">
+      <div class="card articlebottomnav" style="float:right;text-align:right;width:100%">
+  <div class="card-body">
+    <h6 class="card-subtitle mb-2 text-muted">下一篇文章 <i class="fa fa-arrow-right"></i></h6>
+    <h5 class="card-title"><a href="./index.html?type=article&filename=${blog["文章列表"][article_id-1]["文件名"]}">${blog["文章列表"][article_id-1]["文章标题"]}</a></h5>
+  </div>
+</div>
+    </div>
+  </div>
+     
+            `
+            }
+
+            if(article_id !== 0 && blog["文章列表"][article_id+1] != undefined && blog["文章列表"][article_id+1]["是否隐藏"] !== true && blog["文章列表"][article_id-1]["是否隐藏"] !== true){
+              document.getElementById("container").innerHTML += `
+              <div class="row">
+    <div class="col">
+      <div class="card articlebottomnav" style="float:left;width:100%">
+  <div class="card-body">
+    <h6 class="card-subtitle mb-2 text-muted"><i class="fa fa-arrow-left"></i> 上一篇文章</h6>
+    <h5 class="card-title"><a href="./index.html?type=article&filename=${blog["文章列表"][article_id+1]["文件名"]}">${blog["文章列表"][article_id+1]["文章标题"]}</a></h5>
+  </div>
+</div>
+    </div>
+    <div class="col">
+      <div class="card articlebottomnav" style="float:right;text-align:right;width:100%">
+  <div class="card-body">
+    <h6 class="card-subtitle mb-2 text-muted">下一篇文章 <i class="fa fa-arrow-right"></i></h6>
+    <h5 class="card-title"><a href="./index.html?type=article&filename=${blog["文章列表"][article_id-1]["文件名"]}">${blog["文章列表"][article_id-1]["文章标题"]}</a></h5>
+  </div>
+</div>
+    </div>
+  </div>
+     
+            `
+            }
+            
+          }
+
+          
 
 
           if (
@@ -887,6 +1069,9 @@
 
           render_bottom_information();
           execute_custom_js();
+
+          content_load_finished = true;
+          detect_whether_ui_load_finished();
 
           if (
             blog["全局评论设置"]["启用valine评论"] &&
@@ -1154,9 +1339,7 @@
           Date.parse(new Date())
         )
         .then(function (response) {
-          document.querySelector("#page-content").innerHTML += marked.parse(
-            response.data
-          );
+          document.querySelector("#page-content").innerHTML += `<div id="page-content-html">${marked.parse(response.data)}</div>`;
           if (blog["不使用全站内容授权协议"] === false) {
             document.getElementById("page-content").innerHTML += `<br />
             <div class="alert alert-info" role="alert">
@@ -1179,6 +1362,10 @@
           }
           render_bottom_information();
           execute_custom_js();
+
+          content_load_finished = true;
+          detect_whether_ui_load_finished();
+
           if (
             blog["全局评论设置"]["启用valine评论"] &&
             blog["页面列表"][page_id]["启用评论"]
@@ -1217,7 +1404,7 @@
             "./data/pages/" + blog["页面列表"][page_id]["文件名"];
         } else {
           // 当前标签页打开，是markdown
-
+          document.getElementsByTagName("title")[0].innerHTML = `${blog["页面列表"][page_id]["页面标题"]} - ${blog["博客标题"]} `;
           resetPage();
           render_nav(false);
           render_container();
@@ -1245,7 +1432,7 @@
     function render_bottom_information() {
       document.getElementById("container").innerHTML += `
             <hr />
-            <div style="color:grey">
+            <div style="color:grey" id="bottom_info_html">
                 ${marked.parse(blog["底部信息（格式为markdown）"])}
             </div>
             
@@ -1259,6 +1446,7 @@
     }
 
     function enter_tag(tagname) {
+      document.getElementsByTagName("title")[0].innerHTML = `标签为 ${decodeURIComponent(tagname)} 下的文章 - ${blog["博客标题"]} `;
       resetPage();
       render_nav(false);
       render_container();
@@ -1266,18 +1454,26 @@
       render_bottom_information();
       document.getElementById("navbar_archive_and_tags").classList.add("nav-item-active");
       execute_custom_js();
+
+      content_load_finished = true;
+      detect_whether_ui_load_finished();
     }
 
     function enter_friend_book() {
+      document.getElementsByTagName("title")[0].innerHTML = `友人帐 - ${blog["博客标题"]} `;
       resetPage();
       render_nav(false);
       render_container();
       render_friend_book();
       document.getElementById("navbar_friendbook").classList.add("nav-item-active");
 
+      content_load_finished = true;
+      detect_whether_ui_load_finished();
+
     }
 
     function enter_archive_and_tags() {
+      document.getElementsByTagName("title")[0].innerHTML = `归档与标签 - ${blog["博客标题"]} `;
       resetPage();
       render_nav(false);
       render_container();
@@ -1285,9 +1481,13 @@
       render_bottom_information();
       document.getElementById("navbar_archive_and_tags").classList.add("nav-item-active");
       execute_custom_js();
+
+      content_load_finished = true;
+      detect_whether_ui_load_finished();
     }
 
     function enter_indexPage() {
+      document.getElementsByTagName("title")[0].innerHTML = blog["博客标题"];
       resetPage();
       render_nav(true);
       render_container();
@@ -1297,9 +1497,13 @@
       document.getElementById("navbar_article_list").classList.add("nav-item-active");
 
       execute_custom_js();
+
+      content_load_finished = true;
+      detect_whether_ui_load_finished();
     }
 
     function enter_article(article_id) {
+      document.getElementsByTagName("title")[0].innerHTML = `${blog["文章列表"][article_id]["文章标题"]} - ${blog["博客标题"]} `;
       resetPage();
       render_nav(false);
       render_container();
@@ -1318,11 +1522,14 @@
       return false;
     }
 
-    function importCSSFile(uri) {
-      let css = document.createElement('link');
-      css.setAttribute('rel', 'stylesheet');
-      css.setAttribute('href', uri);
-      document.getElementsByTagName('head')[0].appendChild(css);
+    function importBootstrapCSSFile(uri) {
+      axios
+      .get(uri)
+      .then(function (response) {
+        document.getElementById("bootstrap_css").innerHTML+=response.data;
+        bootstrap_css_import_finished = true;
+        detect_whether_ui_load_finished();
+      })
     }
     axios
       .get("./data/index.json?timestamp=" + Date.parse(new Date()))
@@ -1347,8 +1554,7 @@
 
         // js importing disabled due to execution order is inevitable, while css importing can safely operate.
 
-        importCSSFile(cdn_path + "/bootstrap@5.0.2/dist/css/bootstrap.min.css");
-        importCSSFile(cdn_path + "/font-awesome@4.7.0/css/font-awesome.min.css");
+        importBootstrapCSSFile(cdn_path + "/bootstrap@5.0.2/dist/css/bootstrap.min.css");
 
         lang_name = blog["网站语言"];
         articleListPageLength = Math.ceil(blog["文章列表"].length / blog["文章列表中每页的文章数为"]); // 从1开始数
@@ -1388,14 +1594,7 @@
             ]
           ) {
             document.querySelector("#blogcss").innerHTML += `body:before{
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    opacity: .3;
-    z-index: -1;
-    content: "";
-    position: fixed;
+
     background: url(https://api.paugram.com/wallpaper/) center/cover;
 }`;
           }
@@ -1449,8 +1648,7 @@
           }
         }
 
-        document.getElementsByTagName("title")[0].innerHTML =
-          blog["博客标题"];
+        
       });
 
 
